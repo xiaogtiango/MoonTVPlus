@@ -10,18 +10,10 @@ import {
   BangumiCalendarData,
   GetBangumiCalendarData,
 } from '@/lib/bangumi.client';
-// 客户端收藏 API
-import {
-  clearAllFavorites,
-  getAllFavorites,
-  getAllPlayRecords,
-  subscribeToDataUpdates,
-} from '@/lib/db.client';
 import { getDoubanCategories } from '@/lib/douban.client';
 import { getTMDBImageUrl, TMDBItem } from '@/lib/tmdb.client';
 import { DoubanItem } from '@/lib/types';
 
-import CapsuleSwitch from '@/components/CapsuleSwitch';
 import ContinueWatching from '@/components/ContinueWatching';
 import PageLayout from '@/components/PageLayout';
 import ScrollableRow from '@/components/ScrollableRow';
@@ -31,7 +23,7 @@ import HttpWarningDialog from '@/components/HttpWarningDialog';
 import BannerCarousel from '@/components/BannerCarousel';
 
 function HomeClient() {
-  const [activeTab, setActiveTab] = useState<'home' | 'favorites'>('home');
+  // 移除了 activeTab 状态，收藏夹功能已移到 UserMenu
   const [hotMovies, setHotMovies] = useState<DoubanItem[]>([]);
   const [hotTvShows, setHotTvShows] = useState<DoubanItem[]>([]);
   const [hotVarietyShows, setHotVarietyShows] = useState<DoubanItem[]>([]);
@@ -57,22 +49,6 @@ function HomeClient() {
       }
     }
   }, [announcement]);
-
-  // 收藏夹数据
-  type FavoriteItem = {
-    id: string;
-    source: string;
-    title: string;
-    poster: string;
-    episodes: number;
-    source_name: string;
-    currentEpisode?: number;
-    search_title?: string;
-    origin?: 'vod' | 'live';
-  };
-
-  const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
-  const favoritesFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchRecommendData = async () => {
@@ -147,74 +123,7 @@ function HomeClient() {
     fetchRecommendData();
   }, []);
 
-  // 处理收藏数据更新的函数
-  const updateFavoriteItems = useCallback(
-    async (allFavorites: Record<string, any>) => {
-      const allPlayRecords = await getAllPlayRecords();
 
-      // 根据保存时间排序（从近到远）
-      const sorted = Object.entries(allFavorites)
-        .sort(([, a], [, b]) => b.save_time - a.save_time)
-        .map(([key, fav]) => {
-          const plusIndex = key.indexOf('+');
-          const source = key.slice(0, plusIndex);
-          const id = key.slice(plusIndex + 1);
-
-          // 查找对应的播放记录，获取当前集数
-          const playRecord = allPlayRecords[key];
-          const currentEpisode = playRecord?.index;
-
-          return {
-            id,
-            source,
-            title: fav.title,
-            year: fav.year,
-            poster: fav.cover,
-            episodes: fav.total_episodes,
-            source_name: fav.source_name,
-            currentEpisode,
-            search_title: fav?.search_title,
-            origin: fav?.origin,
-          } as FavoriteItem;
-        });
-      setFavoriteItems(sorted);
-    },
-    []
-  );
-
-  // 当切换到收藏夹时加载收藏数据（使用 ref 防止重复加载）
-  useEffect(() => {
-    if (activeTab !== 'favorites') {
-      favoritesFetchedRef.current = false;
-      return;
-    }
-
-    // 已经加载过就不再加载
-    if (favoritesFetchedRef.current) return;
-
-    favoritesFetchedRef.current = true;
-
-    const loadFavorites = async () => {
-      const allFavorites = await getAllFavorites();
-      await updateFavoriteItems(allFavorites);
-    };
-
-    loadFavorites();
-  }, [activeTab, updateFavoriteItems]);
-
-  // 监听收藏更新事件（独立的 useEffect）
-  useEffect(() => {
-    if (activeTab !== 'favorites') return;
-
-    const unsubscribe = subscribeToDataUpdates(
-      'favoritesUpdated',
-      (newFavorites: Record<string, any>) => {
-        updateFavoriteItems(newFavorites);
-      }
-    );
-
-    return unsubscribe;
-  }, [activeTab, updateFavoriteItems]);
 
   const handleCloseAnnouncement = (announcement: string) => {
     setShowAnnouncement(false);
@@ -223,67 +132,15 @@ function HomeClient() {
 
   return (
     <PageLayout>
-      {/* TMDB 热门轮播图 - 只在首页显示，且占满宽度 */}
-      {activeTab === 'home' && (
-        <div className='w-full mb-6 sm:mb-8'>
-          <BannerCarousel />
-        </div>
-      )}
+      {/* TMDB 热门轮播图 */}
+      <div className='w-full mb-6 sm:mb-8'>
+        <BannerCarousel />
+      </div>
 
       <div className='px-2 sm:px-10 py-4 sm:py-8 overflow-visible'>
-        {/* Tab 切换移到轮播图下方 */}
-        <div className='mb-8 flex justify-center'>
-          <CapsuleSwitch
-            options={[
-              { label: '首页', value: 'home' },
-              { label: '收藏夹', value: 'favorites' },
-            ]}
-            active={activeTab}
-            onChange={(value) => setActiveTab(value as 'home' | 'favorites')}
-          />
-        </div>
-
         <div className='max-w-[95%] mx-auto'>
-          {activeTab === 'favorites' ? (
-            // 收藏夹视图
-            <section className='mb-8'>
-              <div className='mb-4 flex items-center justify-between'>
-                <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200'>
-                  我的收藏
-                </h2>
-                {favoriteItems.length > 0 && (
-                  <button
-                    className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                    onClick={async () => {
-                      await clearAllFavorites();
-                      setFavoriteItems([]);
-                    }}
-                  >
-                    清空
-                  </button>
-                )}
-              </div>
-              <div className='justify-start grid grid-cols-3 gap-x-2 gap-y-14 sm:gap-y-20 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,_minmax(11rem,_1fr))] sm:gap-x-8'>
-                {favoriteItems.map((item) => (
-                  <div key={item.id + item.source} className='w-full'>
-                    <VideoCard
-                      query={item.search_title}
-                      {...item}
-                      from='favorite'
-                      type={item.episodes > 1 ? 'tv' : ''}
-                    />
-                  </div>
-                ))}
-                {favoriteItems.length === 0 && (
-                  <div className='col-span-full text-center text-gray-500 py-8 dark:text-gray-400'>
-                    暂无收藏内容
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : (
-            // 首页视图
-            <>
+          {/* 首页内容 */}
+          <>
               {/* 继续观看 */}
               <ContinueWatching />
 
@@ -566,8 +423,7 @@ function HomeClient() {
                   </ScrollableRow>
                 </section>
               )}
-            </>
-          )}
+          </>
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import {
   Rss,
   Settings,
   Shield,
+  Star,
   User,
   X,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { useVersionCheck } from './VersionCheckProvider';
 import { VersionPanel } from './VersionPanel';
 import { OfflineDownloadPanel } from './OfflineDownloadPanel';
 import { NotificationPanel } from './NotificationPanel';
+import { FavoritesPanel } from './FavoritesPanel';
 
 interface AuthInfo {
   username?: string;
@@ -46,6 +48,7 @@ export const UserMenu: React.FC = () => {
   const [isVersionPanelOpen, setIsVersionPanelOpen] = useState(false);
   const [isOfflineDownloadPanelOpen, setIsOfflineDownloadPanelOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
   const [authInfo, setAuthInfo] = useState<AuthInfo | null>(null);
   const [storageType, setStorageType] = useState<string>('localstorage');
   const [mounted, setMounted] = useState(false);
@@ -698,6 +701,18 @@ export const UserMenu: React.FC = () => {
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
+          </button>
+
+          {/* 我的收藏按钮 */}
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              setIsFavoritesPanelOpen(true);
+            }}
+            className='w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm relative'
+          >
+            <Star className='w-4 h-4 text-gray-500 dark:text-gray-400' />
+            <span className='font-medium'>我的收藏</span>
           </button>
 
           {/* 设置按钮 */}
@@ -1530,6 +1545,17 @@ export const UserMenu: React.FC = () => {
               setIsNotificationPanelOpen(false);
               // 不需要在这里刷新，NotificationPanel 内部会触发事件
             }}
+          />,
+          document.body
+        )}
+
+      {/* 使用 Portal 将收藏面板渲染到 document.body */}
+      {isFavoritesPanelOpen &&
+        mounted &&
+        createPortal(
+          <FavoritesPanel
+            isOpen={isFavoritesPanelOpen}
+            onClose={() => setIsFavoritesPanelOpen(false)}
           />,
           document.body
         )}
